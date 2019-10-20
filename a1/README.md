@@ -380,18 +380,27 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
 
   *Why?*: The `this` keyword is contextual and when used within a function inside a controller may change its context. Capturing the context of `this` avoids encountering this problem.
 
-  ```javascript
+  ```typescript
   /* avoid */
-  function CustomerController() {
+  function CustomerController(this: unknown) {
+      this as {
+          name: object;
+          sendMessage: () => void;
+      };
+
       this.name = {};
       this.sendMessage = function() { };
   }
   ```
 
-  ```javascript
+  ```typescript
   /* recommended */
   function CustomerController() {
-      var vm = this;
+      const vm = this as {
+          name: object;
+          sendMessage: () => void;
+      };
+
       vm.name = {};
       vm.sendMessage = function() { };
   }
@@ -401,7 +410,7 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
 
   ```javascript
   /* jshint validthis: true */
-  var vm = this;
+  const vm = this;
   ```
 
   Note: When creating watches in a controller using `controller as`, you can watch the `vm.*` member using the following syntax. (Create watches with caution as they add more load to the digest cycle.)
@@ -411,11 +420,14 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
   ```
 
   ```javascript
-  function SomeController($scope, $log) {
-      var vm = this;
+  function SomeController($scope: ng.IScope, $log: ng.ILogService) {
+      const vm = this as {
+          title: string;
+      };
+
       vm.title = 'Some Title';
 
-      $scope.$watch('vm.title', function(current, original) {
+      $scope.$watch('vm.title', function(current: typeof vm['title'], original: typeof vm['title']) {
           $log.info('vm.title was %s', original);
           $log.info('vm.title is now %s', current);
       });
@@ -446,7 +458,13 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
   ```javascript
   /* avoid */
   function SessionsController() {
-      var vm = this;
+      const vm = this as {
+          gotoSession: () => void;
+          refresh: () => void;
+          search: () => void;
+          sessions: Session[];
+          title: string;
+      };
 
       vm.gotoSession = function() {
         /* ... */
@@ -465,7 +483,13 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
   ```javascript
   /* recommended */
   function SessionsController() {
-      var vm = this;
+      const vm = this as {
+          gotoSession: typeof gotoSession;
+          refresh: typeof refresh;
+          search: typeof search;
+          sessions: Session[];
+          title: string;
+      };
 
       vm.gotoSession = gotoSession;
       vm.refresh = refresh;
@@ -496,7 +520,13 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
   ```javascript
   /* avoid */
   function SessionsController(data) {
-      var vm = this;
+      const vm = this as  {
+          gotoSession: typeof gotoSession;
+          refresh: () => void;
+          search: typeof search;
+          sessions: Session[];
+          title: string;
+      };
 
       vm.gotoSession = gotoSession;
       vm.refresh = function() {
@@ -516,8 +546,14 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
 
   ```javascript
   /* recommended */
-  function SessionsController(sessionDataService) {
-      var vm = this;
+  function SessionsController(sessionDataService: SessionDataServiceInstance) {
+      const vm = this as  {
+          gotoSession: typeof gotoSession;
+          refresh: SessionDataServiceInstance['refresh']
+          search: typeof search;
+          sessions: Session[];
+          title: string;
+      };
 
       vm.gotoSession = gotoSession;
       vm.refresh = sessionDataService.refresh; // 1 liner is OK
@@ -579,8 +615,12 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
    * Using function declarations
    * and bindable members up top.
    */
-  function AvengersController(avengersService, logger) {
-      var vm = this;
+  function AvengersController(this: unknown, avengersService: AvengersServiceInstance, logger: LoggerInstance) {
+      var vm = this as {
+          avengers: Avenger[];
+          getAvengers: typeof getAvengers;
+          title: string;
+      };
       vm.avengers = [];
       vm.getAvengers = getAvengers;
       vm.title = 'Avengers';
@@ -599,6 +639,14 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
               return vm.avengers;
           });
       }
+  }
+
+  type AvengersServiceInstance = {
+      getAvengers: () => Promsie<Avenger[]>
+  }
+
+  type LoggerInstance = {
+      info: (s: string) => void
   }
   ```
 
@@ -648,8 +696,13 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
 
   ```javascript
   /* recommended */
-  function OrderController(creditService) {
-      var vm = this;
+  function OrderController(this: unknown, creditService: CreditServiceInstance) {
+      var vm = this as {
+          checkCredit: typeof checkCredit;
+          isCreditOk: undefined | boolean;
+          total: number;
+      };
+
       vm.checkCredit = checkCredit;
       vm.isCreditOk;
       vm.total = 0;
@@ -659,6 +712,10 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
             .then(function(isOk) { vm.isCreditOk = isOk; })
             .catch(showError);
       };
+  }
+
+  type CreditServiceInstance = {
+      isOrderTotalOk: (total: number) => Promise<boolean>
   }
   ```
 
@@ -708,7 +765,7 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
       .module('app')
       .config(config);
 
-  function config($routeProvider) {
+  function config($routeProvider: ng.route.IRouteProvider) {
       $routeProvider
           .when('/avengers', {
               templateUrl: 'avengers.html',
@@ -748,7 +805,7 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
   }
   ```
 
-  ```javascript
+  ```typescript
   // factory
   angular
       .module('app')
@@ -756,11 +813,13 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
 
   function logger() {
       return {
-          logError: function(msg) {
+          logError: function(msg: string) {
             /* */
           }
      };
   }
+
+  export type LoggerInstance = ReturnType<typeof logger>
   ```
 
 **[Back to top](#table-of-contents)**
@@ -809,11 +868,11 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
   }
   ```
 
-  ```javascript
+  ```typescript
   /* recommended */
   function dataService() {
-      var someValue = '';
-      var service = {
+      let someValue = '';
+      const service = {
           save: save,
           someValue: someValue,
           validate: validate
@@ -830,6 +889,8 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
           /* */
       };
   }
+
+  export type DataServiceInstance = ReturnType<typeof dataService>
   ```
 
   This way bindings are mirrored across the host object, primitive values cannot update alone using the revealing module pattern.
@@ -891,21 +952,21 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
   }
   ```
 
-  ```javascript
+  ```typescript
   /**
    * recommended
    * Using function declarations
    * and accessible members up top.
    */
-  function dataservice($http, $location, $q, exception, logger) {
-      var isPrimed = false;
-      var primePromise;
+  function dataservice($http: ng.IHttpService, $location: ng.ILocationService, $q: ng.IQService, exception: ExceptionInstance, logger: LoggerInstance) {
+      let isPrimed = false;
+      let primePromise: Promise<any>;
 
-      var service = {
-          getAvengersCast: getAvengersCast,
-          getAvengerCount: getAvengerCount,
-          getAvengers: getAvengers,
-          ready: ready
+      const service = {
+          getAvengersCast,
+          getAvengerCount,
+          getAvengers,
+          ready,
       };
 
       return service;
@@ -982,7 +1043,7 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
 
 Note: The data service is called from consumers, such as a controller, hiding the implementation from the consumers, as shown below.
 
-  ```javascript
+  ```typescript
   /* recommended */
 
   // controller calling the dataservice factory
@@ -992,8 +1053,11 @@ Note: The data service is called from consumers, such as a controller, hiding th
 
   AvengersController.$inject = ['dataservice', 'logger'];
 
-  function AvengersController(dataservice, logger) {
-      var vm = this;
+  function AvengersController(this: unknown, dataservice: DataServiceInstance, logger: LoggerInstance) {
+      const vm = this as {
+          avengers: Avenger[];
+      };
+
       vm.avengers = [];
 
       activate();
@@ -1021,7 +1085,7 @@ Note: The data service is called from consumers, such as a controller, hiding th
 
     *Why?*: You can chain the promises together and take further action after the data call completes and resolves or rejects the promise.
 
-  ```javascript
+  ```typescript
   /* recommended */
 
   activate();
@@ -1032,7 +1096,7 @@ Note: The data service is called from consumers, such as a controller, hiding th
        * Ask the getAvengers function for the
        * avenger data and wait for the promise
        */
-      return getAvengers().then(function() {
+      return getAvengers().then(() => {
           /**
            * Step 4
            * Perform an action on resolve of final promise
@@ -1048,7 +1112,7 @@ Note: The data service is called from consumers, such as a controller, hiding th
          * for the promise
          */
         return dataservice.getAvengers()
-            .then(function(data) {
+            .then(data => {
                 /**
                  * Step 3
                  * set the data and resolve the promise
@@ -1102,7 +1166,7 @@ Note: The data service is called from consumers, such as a controller, hiding th
   }
   ```
 
-  ```javascript
+  ```typescript
   /* recommended */
   /* calendar-range.directive.js */
 
@@ -1114,12 +1178,12 @@ Note: The data service is called from consumers, such as a controller, hiding th
       .module('sales.order')
       .directive('acmeOrderCalendarRange', orderCalendarRange);
 
-  function orderCalendarRange() {
+  function orderCalendarRange(): ng.IDirective {
       /* implementation details */
   }
   ```
 
-  ```javascript
+  ```typescript
   /* recommended */
   /* customer-info.directive.js */
 
@@ -1131,12 +1195,12 @@ Note: The data service is called from consumers, such as a controller, hiding th
       .module('sales.widgets')
       .directive('acmeSalesCustomerInfo', salesCustomerInfo);
 
-  function salesCustomerInfo() {
+  function salesCustomerInfo(): ng.IDirective {
       /* implementation details */
   }
   ```
 
-  ```javascript
+  ```typescript
   /* recommended */
   /* spinner.directive.js */
 
@@ -1148,7 +1212,7 @@ Note: The data service is called from consumers, such as a controller, hiding th
       .module('shared.widgets')
       .directive('acmeSharedSpinner', sharedSpinner);
 
-  function sharedSpinner() {
+  function sharedSpinner(): ng.IDirective {
       /* implementation details */
   }
   ```
@@ -1213,21 +1277,21 @@ Note: There are many naming options for directives, especially since they can be
   <div my-calendar-range></div>
   ```
 
-  ```javascript
+  ```typescript
   /* recommended */
   angular
       .module('app.widgets')
       .directive('myCalendarRange', myCalendarRange);
 
-  function myCalendarRange() {
-      var directive = {
-          link: link,
+  function myCalendarRange(): ng.IDirective {
+      const directive = {
+          link,
           templateUrl: '/template/is/located/here.html',
           restrict: 'EA'
       };
       return directive;
 
-      function link(scope, element, attrs) {
+      function link(scope: ng.IScope, element: JQLite, attrs: ng.IAttributes) {
         /* */
       }
   }
@@ -1405,10 +1469,14 @@ Note: You can also name the controller when you inject it into the link function
   }
   ```
 
-  ```javascript
+  ```typescript
   /* recommended */
-  function AvengersController(dataservice) {
-      var vm = this;
+  function AvengersController(this: unknown, dataservice: DataServiceInstance) {
+      var vm = this as {
+          avengers: Avenger[]
+          title: string
+      };
+
       vm.avengers = [];
       vm.title = 'Avengers';
 
@@ -1417,7 +1485,7 @@ Note: You can also name the controller when you inject it into the link function
       ////////////
 
       function activate() {
-          return dataservice.getAvengers().then(function(data) {
+          return dataservice.getAvengers().then(data => {
               vm.avengers = data;
               return vm.avengers;
           });
@@ -1455,7 +1523,7 @@ Note: You can also name the controller when you inject it into the link function
   }
   ```
 
-  ```javascript
+  ```typescript
   /* better */
 
   // route-config.js
@@ -1463,14 +1531,14 @@ Note: You can also name the controller when you inject it into the link function
       .module('app')
       .config(config);
 
-  function config($routeProvider) {
+  function config($routeProvider: ng.route.IRouteProvider) {
       $routeProvider
           .when('/avengers', {
               templateUrl: 'avengers.html',
               controller: 'AvengersController',
               controllerAs: 'vm',
               resolve: {
-                  moviesPrepService: function(movieService) {
+                  moviesPrepService: function(movieService: MovieServiceInstance) {
                       return movieService.getMovies();
                   }
               }
@@ -1483,15 +1551,29 @@ Note: You can also name the controller when you inject it into the link function
       .controller('AvengersController', AvengersController);
 
   AvengersController.$inject = ['moviesPrepService'];
-  function AvengersController(moviesPrepService) {
-      var vm = this;
+  function AvengersController(this: unknown, moviesPrepService: PromiseType<ReturnType<MovieServiceInstance['getMovies']>>) {
+      var vm = this {
+          movies: Movie[]
+      };
+
       vm.movies = moviesPrepService.movies;
   }
+
+  type Movie = unknown
+
+  type MovieServiceInstance = {
+      getMovies: () => Promise<{ movies: Movie[]}>
+  }
+
+  // from utility-types
+  type PromiseType<T extends Promise<any>> = T extends Promise<infer U>
+      ? U
+      : never;
   ```
 
 Note: The example below shows the route resolve points to a named function, which is easier to debug and easier to handle dependency injection.
 
-  ```javascript
+  ```typescript
   /* even better */
 
   // route-config.js
@@ -1511,7 +1593,7 @@ Note: The example below shows the route resolve points to a named function, whic
           });
   }
 
-  function moviesPrepService(movieService) {
+  function moviesPrepService(movieService: MovieServiceInstance) {
       return movieService.getMovies();
   }
 
@@ -1521,10 +1603,24 @@ Note: The example below shows the route resolve points to a named function, whic
       .controller('AvengersController', AvengersController);
 
   AvengersController.$inject = ['moviesPrepService'];
-  function AvengersController(moviesPrepService) {
-        var vm = this;
+  function AvengersController(this: unknown, moviesPrepService: PromiseType<ReturnType<typeof moviesPrepService>>) {
+        var vm = this as {
+            movies: Movie[];
+        };
+
         vm.movies = moviesPrepService.movies;
   }
+
+  type Movie = unknown
+
+  type MovieServiceInstance = {
+      getMovies: () => Promise<{ movies: Movie[]}>
+  }
+
+  // from utility-types
+  type PromiseType<T extends Promise<any>> = T extends Promise<infer U>
+      ? U
+      : never;
   ```
 Note: The code example's dependency on `movieService` is not minification safe on its own. For details on how to make this code minification safe, see the sections on [dependency injection](#manual-annotating-for-dependency-injection) and on [minification and annotation](#minification-and-annotation).
 
@@ -1569,18 +1665,18 @@ Note: The code example's dependency on `movieService` is not minification safe o
   }
   ```
 
-  ```javascript
+  ```typescript
   /* recommended */
-  function getCustomer(id) {
-      return $http.get('/api/customer/' + id)
+  function getCustomer(id: string): Promise<Customer> {
+      return $http.get<Customer>('/api/customer/' + id)
           .then(getCustomerComplete)
           .catch(getCustomerFailed);
 
-      function getCustomerComplete(data, status, headers, config) {
-          return data.data;
+      function getCustomerComplete({ data, status, headers, config }: ng.IHttpResponse<Customer>) {
+          return data;
       }
 
-      function getCustomerFailed(e) {
+      function getCustomerFailed(e: any) {
           var newMessage = 'XHR Failed for getCustomer'
           if (e.data && e.data.description) {
             newMessage = newMessage + '\n' + e.data.description;
@@ -1590,6 +1686,11 @@ Note: The code example's dependency on `movieService` is not minification safe o
           return $q.reject(e);
       }
   }
+
+  const $http: ng.IHttpService
+  const $q: ng.IQService
+
+  type Customer = unknown
   ```
 
 **[Back to top](#table-of-contents)**
@@ -1852,7 +1953,7 @@ Note: The code example's dependency on `movieService` is not minification safe o
 
     Note: Another option is to override the service instead of using a decorator. This is a fine option, but if you want to keep the default behavior and extend it a decorator is recommended.
 
-    ```javascript
+    ```typescript
     /* recommended */
     angular
         .module('blocks.exception')
@@ -1860,16 +1961,16 @@ Note: The code example's dependency on `movieService` is not minification safe o
 
     exceptionConfig.$inject = ['$provide'];
 
-    function exceptionConfig($provide) {
+    function exceptionConfig($provide: ng.IRouteProvider) {
         $provide.decorator('$exceptionHandler', extendExceptionHandler);
     }
 
     extendExceptionHandler.$inject = ['$delegate', 'toastr'];
 
-    function extendExceptionHandler($delegate, toastr) {
+    function extendExceptionHandler($delegate: ng.IExceptionHandlerService, toastr: Toastr): ng.IExceptionHandlerService {
         return function(exception, cause) {
             $delegate(exception, cause);
-            var errorData = {
+            const errorData = {
                 exception: exception,
                 cause: cause
             };
@@ -1881,6 +1982,10 @@ Note: The code example's dependency on `movieService` is not minification safe o
              */
             toastr.error(exception.msg, errorData);
         };
+    }
+
+    type Toastr = {
+        error: (msg: string, data: { exeption: Error, cause?: string }) => void
     }
     ```
 
