@@ -380,14 +380,9 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
 
   *Why?*: The `this` keyword is contextual and when used within a function inside a controller may change its context. Capturing the context of `this` avoids encountering this problem.
 
-  ```typescript
+  ```javascript
   /* avoid */
-  function CustomerController(this: unknown) {
-      this as {
-          name: object;
-          sendMessage: () => void;
-      };
-
+  function CustomerController(this) {
       this.name = {};
       this.sendMessage = function() { };
   }
@@ -395,7 +390,7 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
 
   ```typescript
   /* recommended */
-  function CustomerController() {
+  function CustomerController(this: unknown) {
       const vm = this as {
           name: object;
           sendMessage: () => void;
@@ -993,6 +988,9 @@ While this guide explains the *what*, *why* and *how*, I find it helpful to see 
           // implementation details go here
       }
   }
+
+  type ExceptionInstance = unknown
+  type LoggerInstance = unknown
   ```
 
 **[Back to top](#table-of-contents)**
@@ -1076,6 +1074,14 @@ Note: The data service is called from consumers, such as a controller, hiding th
               });
       }
   }
+
+  type DataServiceInstance = {
+      getAvengers: () => Promise<Avenger[]>
+  }
+  type LoggerInstance = {
+      info: (msg: string) => void
+  }
+  type Avenger = unknown
   ```
 
 ### Return a Promise from Data Calls
@@ -1088,39 +1094,53 @@ Note: The data service is called from consumers, such as a controller, hiding th
   ```typescript
   /* recommended */
 
-  activate();
+  function AvengersController(this: unknown, dataservice: DataServiceInstance, logger: LoggerInstance) {
+      const vm = this as {
+          avengers: Avenger[]
+      };
 
-  function activate() {
-      /**
-       * Step 1
-       * Ask the getAvengers function for the
-       * avenger data and wait for the promise
-       */
-      return getAvengers().then(() => {
+      activate();
+
+      function activate() {
           /**
-           * Step 4
-           * Perform an action on resolve of final promise
+           * Step 1
+           * Ask the getAvengers function for the
+           * avenger data and wait for the promise
            */
-          logger.info('Activated Avengers View');
-      });
+          return getAvengers().then(() => {
+              /**
+               * Step 4
+               * Perform an action on resolve of final promise
+               */
+              logger.info('Activated Avengers View');
+          });
+      }
+
+      function getAvengers() {
+            /**
+             * Step 2
+             * Ask the data service for the data and wait
+             * for the promise
+             */
+            return dataservice.getAvengers()
+                .then(data => {
+                    /**
+                     * Step 3
+                     * set the data and resolve the promise
+                     */
+                    vm.avengers = data;
+                    return vm.avengers;
+            });
+      }
   }
 
-  function getAvengers() {
-        /**
-         * Step 2
-         * Ask the data service for the data and wait
-         * for the promise
-         */
-        return dataservice.getAvengers()
-            .then(data => {
-                /**
-                 * Step 3
-                 * set the data and resolve the promise
-                 */
-                vm.avengers = data;
-                return vm.avengers;
-        });
+  type DataServiceInstance = {
+      getAvengers: () => Promise<Avenger[]>
   }
+  type LoggerInstance = {
+      info: (msg: string) => void
+  }
+  type Avenger = unknown
   ```
 
 **[Back to top](#table-of-contents)**
@@ -1179,7 +1199,9 @@ Note: The data service is called from consumers, such as a controller, hiding th
       .directive('acmeOrderCalendarRange', orderCalendarRange);
 
   function orderCalendarRange(): ng.IDirective {
-      /* implementation details */
+      return {
+          /* implementation details */
+      }
   }
   ```
 
@@ -1196,7 +1218,9 @@ Note: The data service is called from consumers, such as a controller, hiding th
       .directive('acmeSalesCustomerInfo', salesCustomerInfo);
 
   function salesCustomerInfo(): ng.IDirective {
-      /* implementation details */
+      return {
+          /* implementation details */
+      }
   }
   ```
 
@@ -1213,7 +1237,9 @@ Note: The data service is called from consumers, such as a controller, hiding th
       .directive('acmeSharedSpinner', sharedSpinner);
 
   function sharedSpinner(): ng.IDirective {
-      /* implementation details */
+      return {
+          /* implementation details */
+      }
   }
   ```
 
@@ -1309,7 +1335,7 @@ Note: There are many naming options for directives, especially since they can be
     Note: Regarding dependency injection, see [Manually Identify Dependencies](#manual-annotating-for-dependency-injection).
 
     Note: Note that the directive's controller is outside the directive's closure. This style eliminates issues where the injection gets created as unreachable code after a `return`.
-    
+
     Note: Lifecycle hooks were introduced in Angular 1.5. Initialization logic that relies on bindings being present should be put in the controller's $onInit() method, which is guarranteed to always be called after the bindings have been assigned.
 
   ```html
@@ -1353,14 +1379,14 @@ Note: There are many naming options for directives, especially since they can be
       var vm = this;
       vm.min = 3;
       vm.$onInit = onInit;
-      
+
       //////////
-      
+
       console.log('CTRL: $scope.vm.min = %s', $scope.vm.min);
       console.log('CTRL: $scope.vm.max = %s', $scope.vm.max); // undefined in Angular 1.5+
       console.log('CTRL: vm.min = %s', vm.min);
       console.log('CTRL: vm.max = %s', vm.max); // undefined in Angular 1.5+
-      
+
       // Angular 1.5+ does not bind attributes until calling $onInit();
       function onInit() {
           console.log('CTRL-onInit: $scope.vm.min = %s', $scope.vm.min);
@@ -1426,7 +1452,7 @@ Note: You can also name the controller when you inject it into the link function
       var vm = this;
       vm.min = 3;
       vm.$onInit = onInit;
-      
+
       function onInit() = {
           console.log('CTRL: vm.min = %s', vm.min);
           console.log('CTRL: vm.max = %s', vm.max);
@@ -1491,6 +1517,12 @@ Note: You can also name the controller when you inject it into the link function
           });
       }
   }
+
+  type DataServiceInstance = {
+      getAvengers: () => Promise<Avenger[]>
+  }
+
+  type Avenger = unknown
   ```
 
 ### Route Resolve Promises
@@ -1552,7 +1584,7 @@ Note: You can also name the controller when you inject it into the link function
 
   AvengersController.$inject = ['moviesPrepService'];
   function AvengersController(this: unknown, moviesPrepService: PromiseType<ReturnType<MovieServiceInstance['getMovies']>>) {
-      var vm = this {
+      var vm = this as {
           movies: Movie[]
       };
 
@@ -1581,7 +1613,7 @@ Note: The example below shows the route resolve points to a named function, whic
       .module('app')
       .config(config);
 
-  function config($routeProvider) {
+  function config($routeProvider: ng.route.IRouteProvider) {
       $routeProvider
           .when('/avengers', {
               templateUrl: 'avengers.html',
@@ -1597,13 +1629,15 @@ Note: The example below shows the route resolve points to a named function, whic
       return movieService.getMovies();
   }
 
+  type MoviesPrepServiceInstance = PromiseType<ReturnType<typeof moviesPrepService>>
+
   // avengers.js
   angular
       .module('app')
       .controller('AvengersController', AvengersController);
 
   AvengersController.$inject = ['moviesPrepService'];
-  function AvengersController(this: unknown, moviesPrepService: PromiseType<ReturnType<typeof moviesPrepService>>) {
+  function AvengersController(this: unknown, moviesPrepService: MoviesPrepServiceInstance) {
         var vm = this as {
             movies: Movie[];
         };
@@ -1614,7 +1648,7 @@ Note: The example below shows the route resolve points to a named function, whic
   type Movie = unknown
 
   type MovieServiceInstance = {
-      getMovies: () => Promise<{ movies: Movie[]}>
+      getMovies: () => Promise<{ movies: Movie[] }>
   }
 
   // from utility-types
@@ -1687,8 +1721,11 @@ Note: The code example's dependency on `movieService` is not minification safe o
       }
   }
 
-  const $http: ng.IHttpService
-  const $q: ng.IQService
+  let $http: ng.IHttpService
+  let $q: ng.IQService
+  let logger: {
+      error: (msg: string) => void
+  }
 
   type Customer = unknown
   ```
@@ -1961,14 +1998,14 @@ Note: The code example's dependency on `movieService` is not minification safe o
 
     exceptionConfig.$inject = ['$provide'];
 
-    function exceptionConfig($provide: ng.IRouteProvider) {
+    function exceptionConfig($provide: ng.auto.IProvideService) {
         $provide.decorator('$exceptionHandler', extendExceptionHandler);
     }
 
     extendExceptionHandler.$inject = ['$delegate', 'toastr'];
 
     function extendExceptionHandler($delegate: ng.IExceptionHandlerService, toastr: Toastr): ng.IExceptionHandlerService {
-        return function(exception, cause) {
+        return function(exception: Error & { msg: string }, cause?: string) {
             $delegate(exception, cause);
             const errorData = {
                 exception: exception,
@@ -1985,7 +2022,7 @@ Note: The code example's dependency on `movieService` is not minification safe o
     }
 
     type Toastr = {
-        error: (msg: string, data: { exeption: Error, cause?: string }) => void
+        error: (msg: string, data: { exception: Error, cause?: string }) => void
     }
     ```
 
@@ -2579,8 +2616,8 @@ Note: The code example's dependency on `movieService` is not minification safe o
 ### Run Blocks
 ###### [Style [Y171](#style-y171)]
 
-  - Any code that needs to run when an application starts should be declared in a factory, exposed via a function, and injected into the [run block](https://docs.angularjs.org/guide/module#module-loading-dependencies). 
-  
+  - Any code that needs to run when an application starts should be declared in a factory, exposed via a function, and injected into the [run block](https://docs.angularjs.org/guide/module#module-loading-dependencies).
+
   - Consider using manual bootstrapping techniques, as an alternative for logic that must run prior to running the Angular app.
 
     *Why?*: Code directly in a run block can be difficult to test. Placing in a factory makes it easier to abstract and mock.
@@ -3273,7 +3310,7 @@ Use file templates or snippets to help follow consistent styles and patterns. He
     ngservice    // creates an Angular service
     ngfilter     // creates an Angular filter
     ```
-    
+
 **[Back to top](#table-of-contents)**
 
 ## Yeoman Generator
